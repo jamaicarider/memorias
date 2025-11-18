@@ -140,7 +140,7 @@ export default function Home() {
             autoFocus
           />
           <button onClick={() => doAuth(passwordInput)} style={styles.btn}>
-            entrar
+            enter
           </button>
 
           {authError && <div style={styles.error}>{authError}</div>}
@@ -154,11 +154,11 @@ export default function Home() {
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <div style={styles.left}>lived</div>
+        <div style={styles.left}>l+n</div>
 
         <nav style={styles.centerNav}>
           <span style={styles.navItem}>▼ archive</span>
-          <span style={{ ...styles.navItem, marginLeft: 24 }}>▶ ongoing</span>
+          <span style={{ ...styles.navItem, marginLeft: 24 }}></span>
         </nav>
 
         <div style={styles.right}>
@@ -207,8 +207,8 @@ export default function Home() {
                 </div>
 
                 <div style={styles.meta}>
-                  <div style={styles.title}>untitled</div>
-                  <div style={styles.subtitle}>object 2024</div>
+                  <div style={styles.title}>time</div>
+                  <div style={styles.subtitle}>memories 2025</div>
                   <div style={styles.deleteRow}>
                     <button style={styles.deleteBtn} onClick={() => removeFile(f.name)}>
                       delete
