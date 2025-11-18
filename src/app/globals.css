@@ -1,26 +1,88 @@
-@import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* básico */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #__next { height: 100%; }
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: #040405;
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* fundo visual (gradiente + textura sutil) */
+.bg-visual {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(1200px 600px at 10% 10%, rgba(80,60,200,0.12), transparent 8%),
+    radial-gradient(900px 450px at 90% 80%, rgba(30,200,180,0.06), transparent 8%),
+    linear-gradient(180deg,#030305 0%, #0b0b10 100%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* layout */
+.root { position: relative; min-height: 100vh; padding-bottom: 40px; z-index: 1; }
+
+/* header e nav */
+.header { padding: 36px 24px 18px 24px; display: flex; flex-direction: column; gap: 18px; }
+.nav.glass {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px; border-radius: 14px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(10px) saturate(120%); -webkit-backdrop-filter: blur(10px) saturate(120%);
+}
+.brand { font-weight: 700; letter-spacing: 1px; }
+.links { display: flex; gap: 12px; }
+.link {
+  background: transparent; color: #fff; border: none; cursor: pointer;
+  padding: 6px 10px; border-radius: 8px; font-weight: 600;
+}
+.link:hover { background: rgba(255,255,255,0.02); transform: translateY(-1px); }
+
+/* hero */
+.hero { margin-top: 12px; padding: 8px 2px; text-align: left; }
+.hero h1 { font-size: 40px; line-height: 1.02; margin-bottom: 6px; text-shadow: 0 6px 24px rgba(0,0,0,0.6); }
+.hero p { opacity: 0.86; font-size: 15px; }
+
+/* uploader */
+.uploader { display: flex; justify-content: center; padding: 18px 18px; }
+.uploader-card { width: min(1100px, 96%); display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.upload-btn {
+  display: inline-block; cursor: pointer; font-weight: 700; padding: 12px 18px; border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.upload-btn input[type="file"] { display: none; }
+.upload-note { opacity: 0.85; font-size: 13px; }
+
+/* gallery */
+.gallery { padding: 20px; display: flex; flex-direction: column; gap: 16px; align-items: center; }
+.row {
+  width: min(1140px, 96%); display: grid; grid-template-columns: repeat(5, 1fr);
+  gap: 0; border-radius: 12px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.03); background: rgba(0,0,0,0.12);
+}
+.cell { border-right: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.03); min-height: 150px; }
+.cell:nth-child(5n) { border-right: none; } /* remove borda direita no fim da linha */
+.photo { width: 100%; height: 190px; object-fit: cover; display: block; }
+
+/* empty state */
+.empty { width: min(920px, 94%); padding: 44px; text-align: center; font-size: 16px; }
+
+/* footer */
+.footer { display: flex; justify-content: center; padding: 28px 20px 18px; }
+.footer-card { width: min(920px, 94%); text-align: center; opacity: 0.9; }
+
+/* responsividade */
+@media (max-width: 980px) {
+  .hero h1 { font-size: 32px; }
+  .row { grid-template-columns: repeat(3, 1fr); }
+  .photo { height: 160px; }
+}
+@media (max-width: 560px) {
+  .row { grid-template-columns: repeat(2, 1fr); }
+  .photo { height: 140px; }
+  .hero h1 { font-size: 26px; }
+  .nav.glass { padding: 8px; }
 }
