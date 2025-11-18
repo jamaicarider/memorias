@@ -47,10 +47,8 @@ export default function Home() {
   };
 
   const loadFiles = async () => {
-    if (!supabase) {
-      console.error("Supabase client not configured.");
-      return;
-    }
+    if (!supabase) return;
+
     setLoadingList(true);
     try {
       const { data, error } = await supabase.storage.from("memorias").list("", {
@@ -61,26 +59,26 @@ export default function Home() {
       if (error) {
         console.error("list error", error);
         setFiles([]);
-        setLoadingList(false);
         return;
       }
 
       if (!data) {
         setFiles([]);
-        setLoadingList(false);
         return;
       }
 
       const mapped: MemoriaFile[] = data.map((f) => {
-        const publicUrl = supabase!.storage
+        const { data: publicUrlData } = supabase
+          .storage
           .from("memorias")
-          .getPublicUrl(f.name).data.publicUrl;
-        return { name: f.name, publicUrl };
+          .getPublicUrl(f.name);
+        return { name: f.name, publicUrl: publicUrlData.publicUrl };
       });
 
       setFiles(mapped);
     } catch (err) {
-      console.error("loadFiles", err);
+      console.error("loadFiles error", err);
+      setFiles([]);
     } finally {
       setLoadingList(false);
     }
@@ -89,6 +87,7 @@ export default function Home() {
   const uploadFiles = async (filesList: FileList | null) => {
     if (!filesList || !supabase) return;
     setUploading(true);
+
     try {
       for (const f of Array.from(filesList)) {
         const file = f as File;
@@ -96,11 +95,13 @@ export default function Home() {
         const { error } = await supabase.storage
           .from("memorias")
           .upload(fileName, file, { cacheControl: "3600", upsert: false });
+
         if (error) console.error("upload error:", error);
       }
+
       await loadFiles();
     } catch (err) {
-      console.error("upload error", err);
+      console.error("uploadFiles catch:", err);
     } finally {
       setUploading(false);
     }
@@ -110,15 +111,16 @@ export default function Home() {
     if (!supabase) return;
     const ok = confirm("Remover esta imagem? Essa ação é irreversível.");
     if (!ok) return;
+
     try {
       const { error } = await supabase.storage.from("memorias").remove([name]);
       if (error) {
-        console.error("remove error", error);
+        console.error("remove error:", error);
         return;
       }
       await loadFiles();
     } catch (err) {
-      console.error("remove catch", err);
+      console.error("remove catch:", err);
     }
   };
 
@@ -129,7 +131,9 @@ export default function Home() {
       <div style={styles.root}>
         <div style={styles.centerCard}>
           <div style={styles.brand}>lived</div>
-          <div style={{ marginTop: 18, color: "rgba(0,0,0,0.85)" }}>insira a senha para acessar</div>
+          <div style={{ marginTop: 18, color: "rgba(0,0,0,0.85)" }}>
+            insira a senha para acessar
+          </div>
 
           <input
             type="password"
@@ -239,150 +243,38 @@ export default function Home() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    background: "#fff",
-    color: "#000",
-    fontFamily: "Helvetica, Arial, sans-serif",
-    padding: "48px 64px",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 48,
-  },
-  left: {
-    fontSize: 12,
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    fontWeight: 700,
-  },
+  page: { minHeight: "100vh", background: "#fff", color: "#000", fontFamily: "Helvetica, Arial, sans-serif", padding: "48px 64px" },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 48 },
+  left: { fontSize: 12, letterSpacing: 1, textTransform: "uppercase", fontWeight: 700 },
   centerNav: { display: "flex", alignItems: "center", gap: 12 },
   navItem: { fontSize: 11, opacity: 0.7, textTransform: "lowercase" },
   right: { display: "flex", gap: 12, alignItems: "center" },
-  add: {
-    fontSize: 13,
-    padding: "6px 8px",
-    borderRadius: 8,
-    background: "transparent",
-    border: "1px solid rgba(0,0,0,0.06)",
-    cursor: "pointer",
-    fontWeight: 700,
-    color: "#000",
-  },
-  smallLink: {
-    background: "transparent",
-    border: "none",
-    cursor: "pointer",
-    color: "#000",
-    fontSize: 11,
-    opacity: 0.8,
-  },
+  add: { fontSize: 13, padding: "6px 8px", borderRadius: 8, background: "transparent", border: "1px solid rgba(0,0,0,0.06)", cursor: "pointer", fontWeight: 700, color: "#000" },
+  smallLink: { background: "transparent", border: "none", cursor: "pointer", color: "#000", fontSize: 11, opacity: 0.8 },
 
   main: { display: "flex", justifyContent: "center" },
-  grid: {
-    width: "100%",
-    maxWidth: 1300,
-    display: "grid",
-    gridTemplateColumns: "repeat(8, 1fr)",
-    columnGap: 40,
-    rowGap: 120,
-    alignItems: "start",
-  },
+  grid: { width: "100%", maxWidth: 1300, display: "grid", gridTemplateColumns: "repeat(8, 1fr)", columnGap: 40, rowGap: 120, alignItems: "start" },
   loading: { gridColumn: "1 / -1", textAlign: "center", opacity: 0.6 },
   empty: { gridColumn: "1 / -1", textAlign: "center", opacity: 0.6 },
 
-  cell: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-  },
+  cell: { display: "flex", flexDirection: "column", gap: 10 },
   index: { fontSize: 11, opacity: 0.6, textTransform: "lowercase" },
-  imageWrap: {
-    width: "100%",
-    height: 160,
-    background: "#f4f4f4",
-    display: "block",
-    borderRadius: 4,
-    overflow: "hidden",
-    cursor: "pointer",
-  },
+  imageWrap: { width: "100%", height: 160, background: "#f4f4f4", display: "block", borderRadius: 4, overflow: "hidden", cursor: "pointer" },
   image: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
   meta: { marginTop: 6, display: "flex", flexDirection: "column", gap: 4 },
   title: { fontSize: 12, fontWeight: 600, textTransform: "lowercase" },
   subtitle: { fontSize: 10, opacity: 0.6, textTransform: "lowercase" },
   deleteRow: { marginTop: 6 },
-  deleteBtn: {
-    background: "transparent",
-    border: "none",
-    color: "rgba(0,0,0,0.6)",
-    fontSize: 11,
-    cursor: "pointer",
-    textDecoration: "underline",
-  },
+  deleteBtn: { background: "transparent", border: "none", color: "rgba(0,0,0,0.6)", fontSize: 11, cursor: "pointer", textDecoration: "underline" },
 
-  modalOverlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.6)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 60,
-  },
-  modalInner: {
-    maxWidth: "90vw",
-    maxHeight: "90vh",
-    background: "#fff",
-    padding: 12,
-    borderRadius: 8,
-  },
-  modalImage: {
-    display: "block",
-    maxWidth: "80vw",
-    maxHeight: "80vh",
-    objectFit: "contain",
-  },
-  modalClose: {
-    display: "block",
-    marginTop: 8,
-    background: "transparent",
-    border: "1px solid rgba(0,0,0,0.08)",
-    padding: "6px 8px",
-    borderRadius: 6,
-    cursor: "pointer",
-  },
+  modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 60 },
+  modalInner: { maxWidth: "90vw", maxHeight: "90vh", background: "#fff", padding: 12, borderRadius: 8 },
+  modalImage: { display: "block", maxWidth: "80vw", maxHeight: "80vh", objectFit: "contain" },
+  modalClose: { display: "block", marginTop: 8, background: "transparent", border: "1px solid rgba(0,0,0,0.08)", padding: "6px 8px", borderRadius: 6, cursor: "pointer" },
 
-  /* auth styles */
-  centerCard: {
-    width: "min(420px, 92%)",
-    margin: "10vh auto",
-    background: "transparent",
-    padding: 24,
-    borderRadius: 6,
-    textAlign: "center",
-  },
-  input: {
-    marginTop: 18,
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 6,
-    border: "1px solid rgba(0,0,0,0.06)",
-    background: "transparent",
-    color: "#000",
-  },
-  btn: {
-    marginTop: 12,
-    padding: "10px 14px",
-    borderRadius: 6,
-    border: "none",
-    cursor: "pointer",
-    background: "rgba(0,0,0,0.06)",
-    color: "#000",
-    fontWeight: 700,
-    textTransform: "lowercase",
-  },
+  centerCard: { width: "min(420px, 92%)", margin: "10vh auto", background: "transparent", padding: 24, borderRadius: 6, textAlign: "center" },
+  input: { marginTop: 18, width: "100%", padding: "10px 12px", borderRadius: 6, border: "1px solid rgba(0,0,0,0.06)", background: "transparent", color: "#000" },
+  btn: { marginTop: 12, padding: "10px 14px", borderRadius: 6, border: "none", cursor: "pointer", background: "rgba(0,0,0,0.06)", color: "#000", fontWeight: 700, textTransform: "lowercase" },
   error: { marginTop: 10, color: "#b33" },
   smallNote: { marginTop: 14, fontSize: 12, opacity: 0.7 },
 };
