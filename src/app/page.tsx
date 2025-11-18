@@ -1,11 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+import { supabase } from "@/lib/supabaseClient";
 
 type MemoriaFile = { name: string; publicUrl: string };
 
@@ -51,6 +47,10 @@ export default function Home() {
   };
 
   const loadFiles = async () => {
+    if (!supabase) {
+      console.error("Supabase client not configured.");
+      return;
+    }
     setLoadingList(true);
     try {
       const { data, error } = await supabase.storage.from("memorias").list("", {
@@ -60,29 +60,33 @@ export default function Home() {
       if (error) {
         console.error("list error", error);
         setFiles([]);
+        setLoadingList(false);
         return;
       }
       if (!data) {
         setFiles([]);
+        setLoadingList(false);
         return;
       }
 
-      const mapped: MemoriaFile[] = data.map((f) => {
-        const publicUrl = supabase.storage.from("memorias").getPublicUrl(f.name).data.publicUrl;
-        return { name: f.name, publicUrl };
-      });
+      // filtra apenas imagens (jpg, png, jpeg, gif, webp)
+      const mapped: MemoriaFile[] = data
+        .filter(f => /\.(jpe?g|png|gif|webp)$/i.test(f.name))
+        .map(f => ({
+          name: f.name,
+          publicUrl: `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/memorias/${encodeURIComponent(f.name)}`,
+        }));
 
       setFiles(mapped);
     } catch (err) {
       console.error("loadFiles", err);
-      setFiles([]);
     } finally {
       setLoadingList(false);
     }
   };
 
   const uploadFiles = async (filesList: FileList | null) => {
-    if (!filesList) return;
+    if (!filesList || !supabase) return;
     setUploading(true);
     try {
       for (const f of Array.from(filesList)) {
@@ -95,32 +99,37 @@ export default function Home() {
       }
       await loadFiles();
     } catch (err) {
-      console.error("uploadFiles error", err);
+      console.error("upload error", err);
     } finally {
       setUploading(false);
     }
   };
 
   const removeFile = async (name: string) => {
+    if (!supabase) return;
     const ok = confirm("Remover esta imagem? Essa ação é irreversível.");
     if (!ok) return;
-
-    const { error } = await supabase.storage.from("memorias").remove([name]);
-    if (error) {
-      console.error("remove error", error);
-      return;
+    try {
+      const { error } = await supabase.storage.from("memorias").remove([name]);
+      if (error) {
+        console.error("remove error", error);
+        return;
+      }
+      await loadFiles();
+    } catch (err) {
+      console.error("remove catch", err);
     }
-    await loadFiles();
   };
 
   if (authChecked === null) return null;
 
   if (!authChecked) {
     return (
-      <div style={styles.authPage}>
-        <div style={styles.authCard}>
-          <h1 style={styles.brand}>lived</h1>
-          <p>insira a senha para acessar</p>
+      <div style={styles.root}>
+        <div style={styles.centerCard}>
+          <div style={styles.brand}>lived</div>
+          <div style={{ marginTop: 18, color: "rgba(0,0,0,0.85)" }}>insira a senha para acessar</div>
+
           <input
             type="password"
             value={passwordInput}
@@ -133,8 +142,10 @@ export default function Home() {
           <button onClick={() => doAuth(passwordInput)} style={styles.btn}>
             entrar
           </button>
-          {authError && <p style={styles.error}>{authError}</p>}
-          <p style={styles.smallNote}>powered by supabase</p>
+
+          {authError && <div style={styles.error}>{authError}</div>}
+
+          <div style={styles.smallNote}>powered by supabase</div>
         </div>
       </div>
     );
@@ -144,14 +155,20 @@ export default function Home() {
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.left}>lived</div>
+
         <nav style={styles.centerNav}>
           <span style={styles.navItem}>▼ archive</span>
           <span style={{ ...styles.navItem, marginLeft: 24 }}>▶ ongoing</span>
         </nav>
+
         <div style={styles.right}>
           <button
-            onClick={() => document.getElementById("fileInput")?.click()}
+            onClick={() => {
+              const input = document.getElementById("fileInput") as HTMLInputElement | null;
+              input?.click();
+            }}
             style={styles.add}
+            aria-label="add images"
             title="+ add"
           >
             + add
@@ -167,25 +184,31 @@ export default function Home() {
         type="file"
         accept="image/*"
         multiple
-        onChange={(e) => uploadFiles(e.target.files)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => uploadFiles(e.target.files ?? null)}
         style={{ display: "none" }}
       />
 
       <main style={styles.main}>
-        {loadingList ? (
-          <p style={styles.loading}>loading…</p>
-        ) : files.length === 0 ? (
-          <p style={styles.empty}>no images yet — + add to start</p>
-        ) : (
-          <div style={styles.grid}>
-            {files.map((f, idx) => (
+        <div style={styles.grid}>
+          {loadingList ? (
+            <div style={styles.loading}>loading…</div>
+          ) : files.length === 0 ? (
+            <div style={styles.empty}>no images yet — + add to start</div>
+          ) : (
+            files.map((f, idx) => (
               <div key={f.name} style={styles.cell}>
                 <div style={styles.index}>({String(idx + 1).padStart(3, "0")})</div>
-                <div style={styles.imageWrap} onClick={() => setModalSrc(f.publicUrl)}>
+
+                <div
+                  style={styles.imageWrap}
+                  onClick={() => setModalSrc(f.publicUrl)}
+                >
                   <img src={f.publicUrl} alt={f.name} style={styles.image} />
                 </div>
+
                 <div style={styles.meta}>
-                  <div style={styles.title}>{f.name}</div>
+                  <div style={styles.title}>untitled</div>
+                  <div style={styles.subtitle}>object 2024</div>
                   <div style={styles.deleteRow}>
                     <button style={styles.deleteBtn} onClick={() => removeFile(f.name)}>
                       delete
@@ -193,9 +216,9 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </main>
 
       {modalSrc && (
@@ -215,10 +238,10 @@ export default function Home() {
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
-    padding: "24px",
-    fontFamily: "Helvetica, Arial, sans-serif",
     background: "#fff",
     color: "#000",
+    fontFamily: "Helvetica, Arial, sans-serif",
+    padding: "24px 16px",
   },
   header: {
     display: "flex",
@@ -227,43 +250,73 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 24,
     flexWrap: "wrap",
   },
-  left: { fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" },
-  centerNav: { display: "flex", alignItems: "center", gap: 12 },
-  navItem: { fontSize: 12, opacity: 0.7 },
-  right: { display: "flex", gap: 12, alignItems: "center", marginTop: 12 },
-  add: {
-    fontSize: 13,
-    padding: "6px 10px",
-    borderRadius: 6,
-    border: "1px solid rgba(0,0,0,0.2)",
-    background: "transparent",
-    cursor: "pointer",
+  left: {
+    fontSize: 14,
+    letterSpacing: 1,
+    textTransform: "uppercase",
     fontWeight: 700,
   },
-  smallLink: { border: "none", background: "transparent", cursor: "pointer", fontSize: 11 },
-  main: { display: "flex", justifyContent: "center", flexDirection: "column" },
-  loading: { textAlign: "center", opacity: 0.6 },
-  empty: { textAlign: "center", opacity: 0.6 },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-    gap: 16,
+  centerNav: { display: "flex", alignItems: "center", gap: 12, marginTop: 8 },
+  navItem: { fontSize: 12, opacity: 0.7, textTransform: "lowercase" },
+  right: { display: "flex", gap: 12, alignItems: "center", marginTop: 8 },
+  add: {
+    fontSize: 14,
+    padding: "6px 12px",
+    borderRadius: 8,
+    background: "transparent",
+    border: "1px solid rgba(0,0,0,0.06)",
+    cursor: "pointer",
+    fontWeight: 700,
+    color: "#000",
   },
-  cell: { display: "flex", flexDirection: "column", gap: 6 },
-  index: { fontSize: 10, opacity: 0.6 },
+  smallLink: {
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    color: "#000",
+    fontSize: 12,
+    opacity: 0.8,
+  },
+
+  main: { display: "flex", justifyContent: "center" },
+  grid: {
+    width: "100%",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+    gap: 20,
+  },
+  loading: { gridColumn: "1 / -1", textAlign: "center", opacity: 0.6 },
+  empty: { gridColumn: "1 / -1", textAlign: "center", opacity: 0.6 },
+
+  cell: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+  },
+  index: { fontSize: 11, opacity: 0.6, textTransform: "lowercase" },
   imageWrap: {
     width: "100%",
-    aspectRatio: "1/1",
-    overflow: "hidden",
-    borderRadius: 6,
-    cursor: "pointer",
+    height: 120,
     background: "#f4f4f4",
+    display: "block",
+    borderRadius: 4,
+    overflow: "hidden",
+    cursor: "pointer",
   },
-  image: { width: "100%", height: "100%", objectFit: "cover" },
-  meta: { display: "flex", flexDirection: "column", gap: 4 },
-  title: { fontSize: 12, fontWeight: 600, wordBreak: "break-word" },
-  deleteRow: {},
-  deleteBtn: { background: "transparent", border: "none", color: "#b33", cursor: "pointer", fontSize: 11 },
+  image: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
+  meta: { marginTop: 4, display: "flex", flexDirection: "column", gap: 2 },
+  title: { fontSize: 12, fontWeight: 600, textTransform: "lowercase" },
+  subtitle: { fontSize: 10, opacity: 0.6, textTransform: "lowercase" },
+  deleteRow: { marginTop: 2 },
+  deleteBtn: {
+    background: "transparent",
+    border: "none",
+    color: "#000",
+    fontSize: 11,
+    cursor: "pointer",
+    textDecoration: "underline",
+  },
+
   modalOverlay: {
     position: "fixed",
     inset: 0,
@@ -271,16 +324,60 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 999,
+    zIndex: 60,
   },
-  modalInner: { maxWidth: "90vw", maxHeight: "90vh", padding: 8, borderRadius: 6, background: "#fff" },
-  modalImage: { maxWidth: "80vw", maxHeight: "80vh", objectFit: "contain" },
-  modalClose: { marginTop: 8, padding: "6px 10px", cursor: "pointer" },
-  authPage: { display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" },
-  authCard: { padding: 24, borderRadius: 8, width: "90%", maxWidth: 400, textAlign: "center", background: "#fff" },
-  brand: { fontSize: 24, fontWeight: 700 },
-  input: { width: "100%", padding: 10, marginTop: 12, borderRadius: 6, border: "1px solid #ccc" },
-  btn: { marginTop: 12, padding: "10px 14px", borderRadius: 6, cursor: "pointer", fontWeight: 700 },
-  error: { color: "#b33", marginTop: 10 },
+  modalInner: {
+    maxWidth: "90vw",
+    maxHeight: "90vh",
+    background: "#fff",
+    padding: 12,
+    borderRadius: 8,
+  },
+  modalImage: {
+    display: "block",
+    maxWidth: "80vw",
+    maxHeight: "80vh",
+    objectFit: "contain",
+  },
+  modalClose: {
+    display: "block",
+    marginTop: 8,
+    background: "transparent",
+    border: "1px solid rgba(0,0,0,0.08)",
+    padding: "6px 8px",
+    borderRadius: 6,
+    cursor: "pointer",
+  },
+
+  /* auth styles */
+  centerCard: {
+    width: "min(420px, 92%)",
+    margin: "10vh auto",
+    background: "transparent",
+    padding: 24,
+    borderRadius: 6,
+    textAlign: "center",
+  },
+  input: {
+    marginTop: 18,
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 6,
+    border: "1px solid rgba(0,0,0,0.06)",
+    background: "transparent",
+    color: "#000",
+  },
+  btn: {
+    marginTop: 12,
+    padding: "10px 14px",
+    borderRadius: 6,
+    border: "none",
+    cursor: "pointer",
+    background: "rgba(0,0,0,0.06)",
+    color: "#000",
+    fontWeight: 700,
+    textTransform: "lowercase",
+  },
+  error: { marginTop: 10, color: "#b33" },
   smallNote: { marginTop: 14, fontSize: 12, opacity: 0.7 },
 };
